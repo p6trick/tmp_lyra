@@ -1,0 +1,57 @@
+# Dataset paths and download state
+/data/
+**/vlsbench/
+**/vlsu/
+**/imgs/
+**/images/
+download_failures.jsonl
+.download.lock
+.lyra-*.part
+*.incomplete
+*.parquet
+*.csv
+*.jsonl
+
+# Images, archives, and model artifacts
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.bmp
+*.tif
+*.tiff
+*.avif
+*.heic
+*.svg
+*.tar
+*.tgz
+*.gz
+*.zip
+*.7z
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.ckpt
+
+# Python environments and caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.cache/
+.huggingface/
+huggingface_cache/
+.pytest_cache/
+
+# Local configuration and credentials
+.env
+.env.*
+*.env
+*.pem
+*.key
+.netrc
+.git-credentials
+credentials.json
+secrets.json
