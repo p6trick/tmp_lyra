@@ -12,6 +12,16 @@ download_failures.jsonl
 *.csv
 *.jsonl
 
+# Experiment outputs and local model directories
+/outputs/
+/checkpoints/
+/models/
+run.json
+judge_run.json
+.inference.lock
+.judge.lock
+*.gguf
+
 # Images, archives, and model artifacts
 *.png
 *.jpg

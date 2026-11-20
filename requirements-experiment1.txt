@@ -1,0 +1,6 @@
+# Install hardware-specific torch and torchvision before this file.
+accelerate>=1.6,<2
+matplotlib>=3.8,<4
+mistral-common[image]>=1.11.5,<2
+Pillow>=10.4,<13
+transformers==5.21.0

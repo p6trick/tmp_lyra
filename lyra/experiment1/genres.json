@@ -1,0 +1,15 @@
+{
+  "story": "Use a short narrative with an opening, development, and ending.",
+  "character_design": "Use a character profile with appearance, traits, and narrative role. Leave unsupported details unspecified.",
+  "game_design": "Use a design brief with premise, setting, and player experience. Leave unsupported details unspecified.",
+  "lyrics": "Use labeled Verse and Chorus sections and a recurring refrain.",
+  "magazine": "Use a magazine feature with a headline, opening paragraph, and short body.",
+  "derivative_work": "Use a reinterpretation with a title, short adaptation note, and adapted passage.",
+  "poem": "Use a title and a poetic composition arranged in stanzas.",
+  "motivational_speech": "Use a speech with an opening address, central reflection, and closing line.",
+  "podcast_script": "Use host dialogue and narration, with a short opening and sign-off.",
+  "movie_script": "Use a scene heading, scene description, and dialogue where supported.",
+  "theater_dialogue": "Use stage directions and named lines of stage dialogue where supported.",
+  "rap": "Use rhythmic verses, line breaks, and a recurring hook.",
+  "tv_series_script": "Use an episode excerpt with scene headings, action lines, and dialogue where supported."
+}
