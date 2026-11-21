@@ -8,6 +8,7 @@ from .storage import digest
 
 TEMPLATE_FILE = Path(__file__).with_name("genres.json")
 ORIGINAL, LYRA_STYLE, INSTRUCTION_AWARE = "original", "lyra_style", "instruction_aware"
+CONDITIONS = (ORIGINAL, LYRA_STYLE, INSTRUCTION_AWARE)
 GROUNDING = (
     "Keep factual claims about the image grounded in what is visible. "
     "Use fictional elements, metaphors, and dialogue as appropriate to the genre, "
@@ -30,9 +31,13 @@ def read_genres() -> dict[str, str]:
     return json.loads(TEMPLATE_FILE.read_text(encoding="utf-8"))
 
 
-def case_specs(sample_id, genres):
-    yield f"{sample_id}/{ORIGINAL}", ORIGINAL, None
-    for condition in (LYRA_STYLE, INSTRUCTION_AWARE):
+def case_specs(sample_id, genres, selected_condition: str | None = None):
+    for condition in CONDITIONS:
+        if selected_condition is not None and condition != selected_condition:
+            continue
+        if condition == ORIGINAL:
+            yield f"{sample_id}/{condition}", condition, None
+            continue
         for genre in genres:
             yield f"{sample_id}/{condition}/{genre}", condition, genre
 
@@ -50,8 +55,8 @@ def build_prompt(condition: str, genre: str | None, instruction: str, genres: di
     return f"{prompt}\n\n{genres[genre]}\n{GROUNDING}"
 
 
-def prompt_cases(sample, genres):
-    for case_id, condition, genre in case_specs(sample.sample_id, genres):
+def prompt_cases(sample, genres, selected_condition: str | None = None):
+    for case_id, condition, genre in case_specs(sample.sample_id, genres, selected_condition):
         yield {
             "case_id": case_id,
             "condition": condition,

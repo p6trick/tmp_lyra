@@ -4,13 +4,13 @@ import argparse
 import json
 from pathlib import Path
 
-from .conditions import make_plan, prompt_cases
+from .conditions import CONDITIONS, case_specs, make_plan, prompt_cases
 from .config import InferenceConfig, QWEN, add_model_args, model_source, positive_int
 from .storage import append_record, check_manifest, digest, output_lock, read_json, records
 
 
-def case_rows(sample, genres, manifest):
-    for case in prompt_cases(sample, genres):
+def case_rows(sample, genres, manifest, selected_condition: str | None):
+    for case in prompt_cases(sample, genres, selected_condition):
         yield {
             **case,
             "run_id": manifest["run_id"],
@@ -61,7 +61,7 @@ def generate_batch(backend, record_case, image, batch: list[dict]) -> None:
     record_case(failure(batch[0], "generation", message))
 
 
-def run_inference(output, plan, samples, genres, args, settings) -> int:
+def run_inference(output, plan, samples, genres, args, settings, selected_count: int) -> int:
     from PIL import Image
     from tqdm import tqdm
 
@@ -87,15 +87,16 @@ def run_inference(output, plan, samples, genres, args, settings) -> int:
         for row in records(result_path, repair_tail=True):
             if row["run_id"] != manifest["run_id"]:
                 raise SystemExit(f"Conflicting run_id in {result_path}. Use a new output directory.")
-            if row["status"] == "success":
+            if row["status"] == "success" and (args.condition is None or row["condition"] == args.condition):
                 completed.add(row["case_id"])
-        print(f"Planned {plan['case_count']:,} cases, already complete {len(completed):,}", flush=True)
+        condition = args.condition or "all"
+        print(f"Planned {selected_count:,} cases ({condition}), already complete {len(completed):,}", flush=True)
         backend = None
         failed = 0
         with (
             result_path.open("ab") as stream,
             tqdm(
-                total=plan["case_count"], initial=len(completed), desc="Inference",
+                total=selected_count, initial=len(completed), desc=f"Inference ({condition})",
                 unit="case", dynamic_ncols=True, disable=None, postfix="errors=0",
             ) as progress,
         ):
@@ -109,7 +110,7 @@ def run_inference(output, plan, samples, genres, args, settings) -> int:
 
             for index, sample in enumerate(samples, 1):
                 pending = [
-                    row for row in case_rows(sample, genres, manifest)
+                    row for row in case_rows(sample, genres, manifest, args.condition)
                     if row["case_id"] not in completed
                 ]
                 if not pending:
@@ -129,7 +130,7 @@ def run_inference(output, plan, samples, genres, args, settings) -> int:
                     if backend is None:
                         progress.set_description("Loading Qwen")
                         backend = QwenBackend(manifest["model_source"], settings)
-                        progress.set_description("Inference")
+                        progress.set_description(f"Inference ({condition})")
                     rendered = []
                     for row in pending:
                         try:
@@ -156,6 +157,7 @@ def main() -> int:
     parser.add_argument("--data-dir", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--limit", type=positive_int, help="Use the first N samples for a pilot.")
+    parser.add_argument("--condition", choices=CONDITIONS, help="Select one condition. Default: all.")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--plan", action="store_true", help="Print the plan without loading a model.")
     mode.add_argument(
@@ -172,10 +174,18 @@ def main() -> int:
         parser.error("require 1024 <= --min-pixels <= --max-pixels")
     if not args.plan and args.preview_sample_id is None and args.output_dir is None:
         parser.error("--output-dir is required for inference")
+    if args.preview_sample_id is not None and args.condition is not None:
+        parser.error("--preview-sample-id shows both artistic conditions; omit --condition")
 
     plan, samples, genres = make_plan(args.data_dir, args.limit)
+    cases_per_sample = sum(1 for _ in case_specs(samples[0].sample_id, genres, args.condition))
+    selected_count = len(samples) * cases_per_sample
     if args.plan:
         report = {key: value for key, value in plan.items() if key != "samples"}
+        if args.condition is not None:
+            report.update(
+                condition=args.condition, full_case_count=plan["case_count"], case_count=selected_count,
+            )
         report["sample_count"] = len(samples)
         report["missing_images"] = sum(sample.image_path is None for sample in samples)
         report["categories"] = sorted({entry["category"] for entry in plan["samples"]}, key=str)
@@ -197,7 +207,9 @@ def main() -> int:
         args.dtype, args.attention, args.seed, args.batch_size,
         args.min_pixels, args.max_pixels, args.max_new_tokens,
     )
-    return run_inference(args.output_dir.expanduser(), plan, samples, genres, args, settings)
+    return run_inference(
+        args.output_dir.expanduser(), plan, samples, genres, args, settings, selected_count,
+    )
 
 
 if __name__ == "__main__":
