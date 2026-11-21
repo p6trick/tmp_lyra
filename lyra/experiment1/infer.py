@@ -34,7 +34,7 @@ def failure(row: dict, stage: str, error: str) -> dict:
     return row | {"status": "error", "failure_stage": stage, "error": error}
 
 
-def generate_batch(backend, stream, image, batch: list[dict]) -> int:
+def generate_batch(backend, record_case, image, batch: list[dict]) -> None:
     for row in batch:
         row["generation_config"]["actual_batch_size"] = len(batch)
     try:
@@ -44,28 +44,26 @@ def generate_batch(backend, stream, image, batch: list[dict]) -> int:
     except Exception as error:
         message = f"{type(error).__name__}: {error}"
     else:
-        failures = 0
         for row, response in zip(batch, responses):
             row["response"] = response
             if response.strip():
-                append_record(stream, row | {"status": "success"})
+                record_case(row | {"status": "success"})
             else:
-                failures += 1
-                append_record(stream, failure(row, "empty_response", "Target returned no text"))
-        return failures
+                record_case(failure(row, "empty_response", "Target returned no text"))
+        return
 
     backend.clear_cache()
     if len(batch) > 1:
         middle = len(batch) // 2
-        return sum(
-            generate_batch(backend, stream, image, part) for part in (batch[:middle], batch[middle:])
-        )
-    append_record(stream, failure(batch[0], "generation", message))
-    return 1
+        generate_batch(backend, record_case, image, batch[:middle])
+        generate_batch(backend, record_case, image, batch[middle:])
+        return
+    record_case(failure(batch[0], "generation", message))
 
 
 def run_inference(output, plan, samples, genres, args, settings) -> int:
     from PIL import Image
+    from tqdm import tqdm
 
     from .qwen import QwenBackend
 
@@ -94,7 +92,21 @@ def run_inference(output, plan, samples, genres, args, settings) -> int:
         print(f"Planned {plan['case_count']:,} cases, already complete {len(completed):,}", flush=True)
         backend = None
         failed = 0
-        with result_path.open("ab") as stream:
+        with (
+            result_path.open("ab") as stream,
+            tqdm(
+                total=plan["case_count"], initial=len(completed), desc="Inference",
+                unit="case", dynamic_ncols=True, disable=None, postfix="errors=0",
+            ) as progress,
+        ):
+            def record_case(row: dict) -> None:
+                nonlocal failed
+                append_record(stream, row)
+                if row["status"] == "error":
+                    failed += 1
+                    progress.set_postfix_str(f"errors={failed:,}", refresh=False)
+                progress.update()
+
             for index, sample in enumerate(samples, 1):
                 pending = [
                     row for row in case_rows(sample, genres, manifest)
@@ -108,31 +120,32 @@ def run_inference(output, plan, samples, genres, args, settings) -> int:
                     with Image.open(sample.image_path) as source:
                         image = source.convert("RGB")
                 except Exception as error:
+                    message = f"{type(error).__name__}: {error}"
                     for row in pending:
-                        append_record(stream, failure(row, "image_load", f"{type(error).__name__}: {error}"))
-                    failed += len(pending)
+                        record_case(failure(row, "image_load", message))
                     continue
 
                 with image:
                     if backend is None:
+                        progress.set_description("Loading Qwen")
                         backend = QwenBackend(manifest["model_source"], settings)
+                        progress.set_description("Inference")
                     rendered = []
                     for row in pending:
                         try:
                             row["chat_prompt"] = backend.render(row["target_prompt"])
                         except Exception as error:
-                            failed += 1
                             message = f"{type(error).__name__}: {error}"
-                            append_record(stream, failure(row, "chat_template", message))
+                            record_case(failure(row, "chat_template", message))
                             continue
                         row["generation_config"]["effective"] = backend.generation_settings
                         row["runtime"] = backend.runtime
                         rendered.append(row)
                     for start in range(0, len(rendered), settings.batch_size):
-                        failed += generate_batch(
-                            backend, stream, image, rendered[start:start + settings.batch_size],
+                        generate_batch(
+                            backend, record_case, image, rendered[start:start + settings.batch_size],
                         )
-                if index % 25 == 0:
+                if progress.disable and index % 25 == 0:
                     print(f"Processed up to sample {index:,}/{len(samples):,}; errors: {failed:,}", flush=True)
         print(f"Done. Errors in this invocation: {failed:,}. Results: {result_path}")
         return int(failed > 0)
