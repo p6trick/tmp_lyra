@@ -5,9 +5,9 @@ import csv
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from .conditions import INSTRUCTION_AWARE, LYRA_STYLE, ORIGINAL, case_specs
+from .conditions import CONDITIONS, INSTRUCTION_AWARE, LYRA_STYLE, ORIGINAL, case_specs
 from .judge import QUERIES, VLSBENCH_CLASSES
-from .storage import digest, read_json, records
+from .storage import digest, inference_paths, read_json, records
 
 BUCKETS = dict(zip(VLSBENCH_CLASSES, ("refusal", "warning", "unsafe")))
 METRICS = (
@@ -22,14 +22,15 @@ STATUS_COLUMNS = (
 )
 
 
-def load_results(path: Path, run_field: str, run_id: str, fields: tuple[str, ...]) -> dict:
+def load_results(paths: tuple[Path, ...], run_field: str, run_id: str, fields: tuple[str, ...]) -> dict:
     results = {}
-    for row in records(path):
-        if row.get(run_field) != run_id:
-            raise ValueError(f"Unexpected {run_field} in {path}")
-        key = row["case_id"]
-        if key not in results or results[key]["status"] != "success":
-            results[key] = {field: row.get(field) for field in fields}
+    for path in paths:
+        for row in records(path):
+            if row.get(run_field) != run_id:
+                raise ValueError(f"Unexpected {run_field} in {path}")
+            key = row["case_id"]
+            if key not in results or results[key]["status"] != "success":
+                results[key] = {field: row.get(field) for field in fields}
     return results
 
 
@@ -209,7 +210,7 @@ def plot_summary(path: Path, summary) -> None:
 def analyze(run_dir: Path, judge_dir: Path | None, manual_csv: Path | None, output: Path, plot: bool):
     run = read_json(run_dir / "run.json")
     plan = run["plan"]
-    target = load_results(run_dir / "inference.jsonl", "run_id", run["run_id"],
+    target = load_results(inference_paths(run_dir, CONDITIONS), "run_id", run["run_id"],
                           ("status", "response", "failure_stage", "error"))
     judgments = {}
     if judge_dir is not None:
@@ -217,7 +218,7 @@ def analyze(run_dir: Path, judge_dir: Path | None, manual_csv: Path | None, outp
         if judge["input_run_id"] != run["run_id"]:
             raise ValueError("Judge results belong to a different inference run")
         judgments = load_results(
-            judge_dir / "judgments.jsonl", "judge_run_id", judge["judge_run_id"],
+            (judge_dir / "judgments.jsonl",), "judge_run_id", judge["judge_run_id"],
             ("status", "flags", "benchmark_label", "response_sha256", "error"),
         )
     planned = {key for sample in plan["samples"] for key, _, _ in case_specs(sample["sample_id"], plan["genres"])}

@@ -86,7 +86,7 @@ CUDA_VISIBLE_DEVICES=0 python -m lyra.experiment1.infer \
   --batch-size 1 --max-pixels 524288 --max-new-tokens 256 --dtype bf16 --seed 42
 ```
 
-조건을 하나씩 실행하려면 `--condition original`, `--condition lyra_style`, `--condition instruction_aware` 중 하나를 지정합니다. Original은 2,241건이며, 각 창작 조건은 29,133건입니다. 조건별 실행에서 같은 출력 경로와 나머지 설정을 사용하면 결과가 하나의 `inference.jsonl`에 누적되어 대응 비교에 사용할 수 있습니다.
+조건을 하나씩 실행하려면 `--condition original`, `--condition lyra_style`, `--condition instruction_aware` 중 하나를 지정합니다. Original은 2,241건이며, 각 창작 조건은 29,133건입니다. 같은 출력 경로와 설정을 사용하면 하나의 `run.json` 아래에 `inference.original.jsonl`, `inference.lyra_style.jsonl`, `inference.instruction_aware.jsonl`로 조건별 결과를 쌓습니다. 판정과 분석은 이 파일들과 기존 `inference.jsonl`을 함께 읽습니다.
 
 ```bash
 RUN_DIR=./outputs/experiment1/by-condition
@@ -94,7 +94,13 @@ CUDA_VISIBLE_DEVICES=0 python -m lyra.experiment1.infer \
   --data-dir "$DATA_DIR" --output-dir "$RUN_DIR" --condition original
 ```
 
-`run.json`은 데이터 메타데이터 SHA-256, 데이터셋 출처, 장르 및 프롬프트 해시, 계획된 샘플, 모델 커밋, 실행 설정을 기록합니다. 로컬 모델 경로를 선택했다면 해당 체크포인트를 실행 기간 동안 고정해 두세요. `inference.jsonl`은 `case_id`, `sample_id`, 원본 메타데이터, 원본 질문, 생성에 사용한 `target_prompt`, 모델 템플릿이 렌더링한 `chat_prompt`, 응답, 실제 디코딩 설정 및 오류를 기록합니다. 이미지 경로는 `DATA_DIR/vlsbench` 기준입니다.
+기존 단일 `inference.jsonl`을 나누려면 해당 실행의 추론과 판정을 멈춘 뒤 아래 명령을 한 번 실행합니다. 각 행의 `condition`을 기준으로 결과를 옮기고, 원본은 `inference.legacy.bak.jsonl`로 보관합니다. 이미 작성된 조건별 결과가 있으면 기존 단일 파일의 기록 뒤에 이어집니다. 같은 실행 폴더에서 다음 조건을 실행하면 성공한 케이스를 재사용합니다.
+
+```bash
+python -m lyra.experiment1.split_results --run-dir "$RUN_DIR"
+```
+
+`run.json`은 데이터 메타데이터 SHA-256, 데이터셋 출처, 장르 및 프롬프트 해시, 계획된 샘플, 모델 커밋, 실행 설정을 기록합니다. 로컬 모델 경로를 선택했다면 해당 체크포인트를 실행 기간 동안 고정해 두세요. 추론 JSONL에는 `case_id`, `sample_id`, 원본 메타데이터, 원본 질문, 생성에 사용한 `target_prompt`, 모델 템플릿이 렌더링한 `chat_prompt`, 응답, 실제 디코딩 설정 및 오류가 들어 있습니다. 이미지 경로는 `DATA_DIR/vlsbench` 기준입니다.
 
 같은 설정과 출력 디렉터리에서 재실행하면 성공 케이스를 건너뛰고 나머지를 시도합니다. 재개 전에 `run.json`의 프롬프트 해시와 설정을 검증합니다. 공통 문구나 장르 템플릿을 바꾼 뒤에는 새 출력 디렉터리를 지정합니다. 크기가 큰 배치가 실패하면 더 작은 배치로 재시도하고 실제 배치 크기를 기록합니다. 장비나 CUDA/PyTorch 환경이 바뀌면 greedy 실행에서도 토큰 결과가 달라질 수 있으므로 비교 실험에는 동일한 런타임을 사용하세요.
 

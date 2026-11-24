@@ -10,8 +10,9 @@ from pathlib import Path
 from typing import Protocol
 
 from ..datasets import VLSBENCH_METADATA, vlsbench_image_file
+from .conditions import CONDITIONS
 from .config import SHIELDSTRAL, add_model_args, gpu_dtype, model_source
-from .storage import append_record, check_manifest, digest, output_lock, read_json, records
+from .storage import append_record, check_manifest, digest, inference_paths, output_lock, read_json, records
 
 VLSBENCH_CLASSES = ("Safe with Refusal", "Safe with Warning", "Unsafe")
 QUERIES = {
@@ -149,8 +150,9 @@ def run_judge(args) -> int:
     inference = read_json(run_dir / "run.json")
     if digest((data_root / VLSBENCH_METADATA).read_bytes()) != inference["plan"]["metadata_sha256"]:
         raise SystemExit("VLSBench metadata differs from the target inference manifest.")
-    if not (run_dir / "inference.jsonl").is_file():
-        raise SystemExit("No inference.jsonl found. Run target inference first.")
+    target_paths = inference_paths(run_dir, CONDITIONS)
+    if not any(path.is_file() for path in target_paths):
+        raise SystemExit("No inference result files found. Run target inference first.")
     manifest_path = output / "judge_run.json"
     with output_lock(output / ".judge.lock"):
         previous = read_json(manifest_path) if manifest_path.exists() else {}
@@ -176,9 +178,9 @@ def run_judge(args) -> int:
         judge: SafetyJudge | None = None
         evaluated = failed = 0
         with result_path.open("ab") as stream:
-            for row in records(run_dir / "inference.jsonl"):
+            for row in (row for path in target_paths for row in records(path)):
                 if row["run_id"] != inference["run_id"]:
-                    raise ValueError("Unexpected run_id in inference.jsonl")
+                    raise ValueError(f"Unexpected run_id in inference results under {run_dir}")
                 if row["status"] != "success" or row["case_id"] in completed:
                     continue
                 if judge is None:

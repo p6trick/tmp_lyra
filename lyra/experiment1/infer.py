@@ -2,11 +2,15 @@
 
 import argparse
 import json
+from contextlib import ExitStack
 from pathlib import Path
 
 from .conditions import CONDITIONS, case_specs, make_plan, prompt_cases
 from .config import InferenceConfig, QWEN, add_model_args, model_source, positive_int
-from .storage import append_record, check_manifest, digest, output_lock, read_json, records
+from .storage import (
+    append_record, check_manifest, digest, inference_path, inference_paths, output_lock,
+    read_json, records,
+)
 
 
 def case_rows(sample, genres, manifest, selected_condition: str | None):
@@ -69,12 +73,13 @@ def run_inference(output, plan, samples, genres, args, settings, selected_count:
 
     with output_lock(output / ".inference.lock"):
         manifest_path = output / "run.json"
-        result_path = output / "inference.jsonl"
+        result_paths = inference_paths(output, CONDITIONS)
+        legacy_path = result_paths[0]
         previous = read_json(manifest_path) if manifest_path.exists() else {}
         if previous and previous["plan"]["prompt_sha256"] != plan["prompt_sha256"]:
             raise SystemExit(f"Prompt hash differs from {manifest_path}. Use a new output directory.")
-        if not manifest_path.exists() and result_path.exists() and result_path.stat().st_size:
-            raise SystemExit(f"Cannot resume {result_path} without {manifest_path}. Use a new output directory.")
+        if not manifest_path.exists() and any(path.is_file() and path.stat().st_size for path in result_paths):
+            raise SystemExit(f"Cannot resume results without {manifest_path}. Use a new output directory.")
         manifest = {
             "schema_version": 1,
             "plan": plan,
@@ -84,25 +89,31 @@ def run_inference(output, plan, samples, genres, args, settings, selected_count:
         manifest["run_id"] = digest(manifest)
         check_manifest(manifest_path, manifest)
         completed = set()
-        for row in records(result_path, repair_tail=True):
-            if row["run_id"] != manifest["run_id"]:
-                raise SystemExit(f"Conflicting run_id in {result_path}. Use a new output directory.")
-            if row["status"] == "success" and (args.condition is None or row["condition"] == args.condition):
-                completed.add(row["case_id"])
+        for result_path in result_paths:
+            for row in records(result_path, repair_tail=result_path != legacy_path):
+                if row["run_id"] != manifest["run_id"]:
+                    raise SystemExit(f"Conflicting run_id in {result_path}. Use a new output directory.")
+                if row["status"] == "success" and (args.condition is None or row["condition"] == args.condition):
+                    completed.add(row["case_id"])
         condition = args.condition or "all"
         print(f"Planned {selected_count:,} cases ({condition}), already complete {len(completed):,}", flush=True)
         backend = None
         failed = 0
         with (
-            result_path.open("ab") as stream,
+            ExitStack() as files,
             tqdm(
                 total=selected_count, initial=len(completed), desc=f"Inference ({condition})",
                 unit="case", dynamic_ncols=True, disable=None, postfix="errors=0",
             ) as progress,
         ):
+            streams = {}
+
             def record_case(row: dict) -> None:
                 nonlocal failed
-                append_record(stream, row)
+                name = row["condition"]
+                if name not in streams:
+                    streams[name] = files.enter_context(inference_path(output, name).open("ab"))
+                append_record(streams[name], row)
                 if row["status"] == "error":
                     failed += 1
                     progress.set_postfix_str(f"errors={failed:,}", refresh=False)
@@ -148,7 +159,7 @@ def run_inference(output, plan, samples, genres, args, settings, selected_count:
                         )
                 if progress.disable and index % 25 == 0:
                     print(f"Processed up to sample {index:,}/{len(samples):,}; errors: {failed:,}", flush=True)
-        print(f"Done. Errors in this invocation: {failed:,}. Results: {result_path}")
+        print(f"Done. Errors in this invocation: {failed:,}. Results directory: {output}")
         return int(failed > 0)
 
 

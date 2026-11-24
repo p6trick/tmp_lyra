@@ -21,6 +21,14 @@ def read_json(path: Path):
     return json.loads(path.read_bytes())
 
 
+def inference_path(directory: Path, condition: str) -> Path:
+    return directory / f"inference.{condition}.jsonl"
+
+
+def inference_paths(directory: Path, conditions: tuple[str, ...]) -> tuple[Path, ...]:
+    return (directory / "inference.jsonl", *(inference_path(directory, name) for name in conditions))
+
+
 @contextmanager
 def output_lock(path: Path):
     path.parent.mkdir(parents=True, exist_ok=True)
