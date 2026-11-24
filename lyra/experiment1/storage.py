@@ -45,11 +45,15 @@ def check_manifest(path: Path, manifest: dict) -> None:
         if read_json(path) != manifest:
             raise SystemExit(f"Settings differ from {path}. Use a new output directory.")
         return
+    write_json(path, manifest)
+
+
+def write_json(path: Path, data: dict) -> None:
     temp = NamedTemporaryFile(dir=path.parent, delete=False)
     temporary = Path(temp.name)
     try:
         with temp:
-            temp.write(encode(manifest) + b"\n")
+            temp.write(encode(data) + b"\n")
         temporary.replace(path)
     finally:
         temporary.unlink(missing_ok=True)

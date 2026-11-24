@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .conditions import CONDITIONS, case_specs, make_plan, prompt_cases
 from .config import InferenceConfig, QWEN, add_model_args, model_source, positive_int
+from .inference_format import InferenceProfiles
 from .storage import (
     append_record, check_manifest, digest, inference_path, inference_paths, output_lock,
     read_json, records,
@@ -88,6 +89,7 @@ def run_inference(output, plan, samples, genres, args, settings, selected_count:
         }
         manifest["run_id"] = digest(manifest)
         check_manifest(manifest_path, manifest)
+        profiles = InferenceProfiles(output)
         completed = set()
         for result_path in result_paths:
             for row in records(result_path, repair_tail=result_path != legacy_path):
@@ -113,7 +115,7 @@ def run_inference(output, plan, samples, genres, args, settings, selected_count:
                 name = row["condition"]
                 if name not in streams:
                     streams[name] = files.enter_context(inference_path(output, name).open("ab"))
-                append_record(streams[name], row)
+                append_record(streams[name], profiles.compact(row))
                 if row["status"] == "error":
                     failed += 1
                     progress.set_postfix_str(f"errors={failed:,}", refresh=False)

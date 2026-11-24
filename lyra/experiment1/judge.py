@@ -12,6 +12,7 @@ from typing import Protocol
 from ..datasets import VLSBENCH_METADATA, vlsbench_image_file
 from .conditions import CONDITIONS
 from .config import SHIELDSTRAL, add_model_args, gpu_dtype, model_source
+from .inference_format import judge_input_row
 from .storage import append_record, check_manifest, digest, inference_paths, output_lock, read_json, records
 
 VLSBENCH_CLASSES = ("Safe with Refusal", "Safe with Warning", "Unsafe")
@@ -183,6 +184,7 @@ def run_judge(args) -> int:
                     raise ValueError(f"Unexpected run_id in inference results under {run_dir}")
                 if row["status"] != "success" or row["case_id"] in completed:
                     continue
+                row = judge_input_row(row)
                 if judge is None:
                     judge = ShieldstralJudge(manifest["model_source"], settings)
                 result = {

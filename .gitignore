@@ -18,6 +18,7 @@ download_failures.jsonl
 /models/
 run.json
 judge_run.json
+inference_profiles.json
 .inference.lock
 .judge.lock
 *.gguf

@@ -100,7 +100,17 @@ CUDA_VISIBLE_DEVICES=0 python -m lyra.experiment1.infer \
 python -m lyra.experiment1.split_results --run-dir "$RUN_DIR"
 ```
 
-`run.json`은 데이터 메타데이터 SHA-256, 데이터셋 출처, 장르 및 프롬프트 해시, 계획된 샘플, 모델 커밋, 실행 설정을 기록합니다. 로컬 모델 경로를 선택했다면 해당 체크포인트를 실행 기간 동안 고정해 두세요. 추론 JSONL에는 `case_id`, `sample_id`, 원본 메타데이터, 원본 질문, 생성에 사용한 `target_prompt`, 모델 템플릿이 렌더링한 `chat_prompt`, 응답, 실제 디코딩 설정 및 오류가 들어 있습니다. 이미지 경로는 `DATA_DIR/vlsbench` 기준입니다.
+`run.json`은 데이터 메타데이터 SHA-256, 데이터셋 출처, 장르 및 프롬프트 해시, 계획된 샘플, 모델 커밋, 실행 설정을 기록합니다. 로컬 모델 경로를 선택했다면 해당 체크포인트를 실행 기간 동안 고정해 두세요.
+
+새 추론 행은 `id`, `instruction`, `response`, `image_path`, 라벨과 함께 재개·짝 비교에 필요한 식별자, 상태, 프로필 참조를 저장합니다. 창작 조건의 실제 입력 문구는 `target_prompt`에 있습니다. Original에서 질문과 입력 문구가 같으면 `instruction`에 한 번만 기록합니다. 원본 메타데이터는 VLSBench `data.json`의 `instruction_id`와 행의 `id`로 연결할 수 있습니다.
+
+`inference_profiles.json`은 반복되는 실제 생성 설정과 GPU·소프트웨어 정보를 프로필 ID별로 저장합니다. `chat_wrapper`가 있으면 앞 문자열, `target_prompt`(Original은 `instruction`), 뒤 문자열을 연결해 채팅 텍스트를 복원할 수 있습니다. 이 구조로 표현할 수 없는 채팅 텍스트는 행의 `chat_prompt`에 보관합니다. 실제 배치 크기는 행의 `actual_batch_size`에 기록합니다. 이미지 경로는 `DATA_DIR/vlsbench` 기준입니다. 실행을 옮길 때는 `run.json`, 조건별 JSONL, `inference_profiles.json`을 함께 옮깁니다.
+
+이전 형식의 결과를 변경하려면 해당 실행의 추론과 판정을 멈추고 아래를 실행합니다. 변환할 행이 있는 파일의 원본은 `inference-backups/`에 gzip으로 보관됩니다. 기존 단일 JSONL이 있으면 먼저 조건별로 분리하며 그 원본 백업도 보관합니다. 변환 전후 파일 크기는 명령이 출력합니다.
+
+```bash
+python -m lyra.experiment1.compact_results --run-dir "$RUN_DIR"
+```
 
 같은 설정과 출력 디렉터리에서 재실행하면 성공 케이스를 건너뛰고 나머지를 시도합니다. 재개 전에 `run.json`의 프롬프트 해시와 설정을 검증합니다. 공통 문구나 장르 템플릿을 바꾼 뒤에는 새 출력 디렉터리를 지정합니다. 크기가 큰 배치가 실패하면 더 작은 배치로 재시도하고 실제 배치 크기를 기록합니다. 장비나 CUDA/PyTorch 환경이 바뀌면 greedy 실행에서도 토큰 결과가 달라질 수 있으므로 비교 실험에는 동일한 런타임을 사용하세요.
 
