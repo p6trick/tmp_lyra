@@ -2,6 +2,8 @@
 
 [Experiment 1 실행 가이드](docs/experiment1.md)에서 VLSBench 장르 실험의 WSL 계획 확인, GPU 추론, 로컬 판정, CSV 분석 절차를 볼 수 있습니다.
 
+[DGX Spark StyleVector · EmoStyle 실행 가이드](docs/continuous-style.md)에는 두 Conda 환경의 설치, 체크포인트 준비, 단일 샘플 Smoke Test 명령이 있습니다.
+
 Lyra는 VLSBench와 VLSU의 원본 메타데이터 및 이미지를 로컬에 저장하고, Python에서 샘플 단위로 읽습니다. WSL과 Linux 모두 `lyra` Conda 환경에서 실행합니다. 새 환경에는 Python 3.11을 설치하며, 기존 `lyra` 환경을 재사용하려면 Python 3.10 이상이 필요합니다. GPU, CUDA, PyTorch는 필요하지 않습니다.
 
 | 데이터셋 | 원본 메타데이터 | 이미지 | 로더의 라벨 키 |

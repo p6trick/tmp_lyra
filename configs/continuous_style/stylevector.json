@@ -1,0 +1,23 @@
+{
+  "layer": 17,
+  "alpha": 1.0,
+  "max_new_tokens": 64,
+  "prompt": "Describe an empty train platform after the rain in two sentences.",
+  "pairs": [
+    {
+      "prompt": "Describe a lighthouse at dusk in one sentence.",
+      "positive": "At dusk the lighthouse blinked over the harbor like a tired watchman.",
+      "negative": "At dusk the lighthouse flashed regularly over the harbor."
+    },
+    {
+      "prompt": "Describe the first snowfall in a city square in one sentence.",
+      "positive": "The first snow fell over the square and tucked its stones under a white blanket.",
+      "negative": "The first snowfall covered the stones in the city square with snow."
+    },
+    {
+      "prompt": "Describe sunlight entering a quiet room in one sentence.",
+      "positive": "A ribbon of sunlight slipped through the window and unrolled across the quiet room.",
+      "negative": "Sunlight came through the window and reached across the quiet room."
+    }
+  ]
+}

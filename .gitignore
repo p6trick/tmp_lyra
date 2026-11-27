@@ -14,6 +14,7 @@ download_failures.jsonl
 
 # Experiment outputs and local model directories
 /outputs/
+/runs/continuous_style/
 /checkpoints/
 /models/
 run.json
@@ -45,6 +46,7 @@ inference_profiles.json
 *.pt
 *.pth
 *.ckpt
+!/configs/continuous_style/emostyle-example.png
 
 # Python environments and caches
 .venv/

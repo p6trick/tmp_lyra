@@ -1,0 +1,37 @@
+diff --git a/flux/modules/conditioner.py b/flux/modules/conditioner.py
+index b180abc..75c5940 100644
+--- a/flux/modules/conditioner.py
++++ b/flux/modules/conditioner.py
+@@ -22,3 +22,3 @@ class HFEmbedder(nn.Module):
+         super().__init__()
+-        self.is_clip = "clip" in version.lower()
++        self.is_clip = "clip" in version.rsplit("/", 1)[-1].lower()
+         self.max_length = max_length
+diff --git a/flux/util.py b/flux/util.py
+index bea50a4..9dbb24c 100644
+--- a/flux/util.py
++++ b/flux/util.py
+@@ -314,3 +314,3 @@ def load_flow_model_only_lora(
+     # ckpt_path = configs[name].ckpt_path
+-    ckpt_path = "/mnt/d/bzh/emostyle/weights/FLUX.1-dev/flux1-dev.safetensors"
++    ckpt_path = os.environ["FLUX_DEV"]
+     if (
+@@ -496,3 +496,3 @@ def load_ae(
+     # ckpt_path = configs[name].ae_path
+-    ckpt_path = "/mnt/d/bzh/emostyle/weights/FLUX.1-dev/ae.safetensors"
++    ckpt_path = os.environ["AE"]
+     if (
+diff --git a/inference_emostyle.py b/inference_emostyle.py
+index 69e1a61..0df04c8 100644
+--- a/inference_emostyle.py
++++ b/inference_emostyle.py
+@@ -94,3 +94,3 @@ def main(args: InferenceArgs):
+     ).to(accelerator.device)
+-    ckpt_path = "USO/uso_flux_v1.0/projector.safetensors"
++    ckpt_path = os.environ["PROJECTION_MODEL"]
+     raw_state = load_sft(ckpt_path, target_device=torch.device("cpu"))
+@@ -110,3 +110,3 @@ def main(args: InferenceArgs):
+     # Load SigLIP vision
+-    siglip_path = "weights/siglip"
++    siglip_path = os.environ["SIGLIP_PATH"]
+     siglip_processor = SiglipImageProcessor.from_pretrained(siglip_path)
